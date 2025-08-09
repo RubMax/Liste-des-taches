@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>Liste des Tâches</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <style>
+ html, body {
+          height: 100%;
+          margin: 0;
+          padding: 0;
+          overflow: hidden;
+        }
+   body {
+  border-radius: 20px;
+  overflow: visible;
+}
+
+
+.wrapper {
+  height: 100%;
+  margin: 0 auto;
+  max-width: 95%;
+  background: white;
+  border-radius: 20px;
+  overflow: hidden; /* si tu veux encore masquer le scroll interne */
+}
+
+
+    .container-fluid {
+          min-height: 100vh; /* prend toute la hauteur de l'écran */
+          border-radius: 20px; /* ✅ arrondit les 4 coins */
+        }
+
+    h6 {
+      text-align: center;
+      color: #2c3e50;
+      margin-bottom: 2px;
+    }
+
+    input, select, button {
+      padding: 5px;
+      margin: 5px 5px 5px 0;
+      border-radius: 10px;
+      border: 1px solid #ccc;
+      font-size: 1em;
+    }
+
+    #taskInput { width: 35%; }
+    #repeatSelect, #dateInput, #reminderTimeInput { width: 10%; }
+
+    @media (max-width: 600px) {
+      #taskInput, #repeatSelect, #dateInput, #reminderTimeInput {
+        width: 100% !important;
+      }
+    }
+
+    button {
+  background-color: #007bff;
+  color: white;
+  border: none;
+  transition: background-color 0.3s ease;
+  padding: 2px 6px;          /* ✅ réduit la taille interne du bouton */
+  font-size: 12px;           /* ✅ texte plus petit */
+  line-height: 1;            /* ✅ hauteur de ligne compacte */
+  border-radius: 4px;        /* optionnel : léger arrondi */
+  display: inline-block;
+}
+
+
+    button:hover {
+      background-color: #0056b3;
+    }
+
+    input, select {
+      font-size: 12px;
+      padding: 2px 6px;
+      margin: 2px;
+      border-radius: 4px;
+      border: 1px solid #ccc;
+      line-height: 1;
+      box-sizing: border-box;
+    }
+
+    .task {
+      background-color: rgb(131, 173, 220);
+      border-radius: 12px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+      margin-top: 5px;
+      padding: 5px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transition: transform 0.2s, opacity 0.5s ease-in-out;
+      opacity: 0;
+      animation: fadeIn 0.5s forwards;
+    }
+
+    @keyframes fadeIn {
+      to { opacity: 1; }
+    }
+    
+
+    #taskList {
+      font-size: 15px;
+      margin-top: 8px;
+    min-height: 400px; /* Hauteur minimale même s'il n'y a pas de tâches */
+    max-height: 300px; /* Limite la hauteur si trop de tâches */
+    overflow-y: auto;  /* Scroll uniquement si dépasse la hauteur */
+    background-color: #f8f9fa;
+    border-radius: 10px;
+    padding: 10px;
+    font-size: 13px;
+  }
+
+    .task.completed span {
+      text-decoration: line-through;
+      color: #95a5a6;
+    }
+
+    .priority-daily { background-color: #e3f2fd; border-left: 6px solid #2196f3; }
+    .priority-monthly { background-color: #fff3e0; border-left: 6px solid #fb8c00; }
+    .priority-yearly { background-color: #e8f5e9; border-left: 6px solid #4caf50; }
+
+    .buttons { display: flex; gap: 5px; }
+    .buttons button { background-color: rgb(131, 173, 220); color: white; }
+    .buttons button:hover { background-color: #495057; }
+
+    .info { font-size: 0.75em; color: #007bff; }
+
+    .filter-buttons button {
+      padding: 4px 6px;
+      border-radius: 8px;
+      cursor: pointer;
+      border: none;
+    }
+
+    .filter-buttons button:hover {
+      background-color: #0056b3;
+    }
+
+    .filter-buttons .active {
+      background-color: gray !important;
+    }
+
+    .search-section .icon {
+          font-size: 14px; /* Ajuste la taille ici */
+        }
+            .image-container {
+          text-align: center; /* Centrer les images */
+        }
+
+        .image-container img {
+          width: 400px; /* Ajuste la taille selon ce que tu veux */
+          height: 90px;
+          margin-bottom: 0px; /* Marge entre les images */
+        }
+
+  </style>
+</head>
+        
+<body >
+   <div class="wrapper">
+<div class="image-container">
+          <img src="img/entet.png" alt="Entête">
+        
+          <img src="img/servicos.png" alt="Services">
+        </div>
+<div class="container-fluid mt-1" style="background-color: rgb(131, 173, 220);">
+
+  
+
+  <div class="row">
+    <div class="col-sm-2">
+       <h6>Liste des Tâches</h6>
+      <div style="margin-top: 5px; padding: 5px; border: 1px solid #ccc; border-radius: 10px; background-color: #f8f9fa;">
+            <button class="w-100 mb-1"><a href="index.html", target="_blank">Index</a></button>
+
+      </div>
+
+      <div style="margin-top: 5px; padding: 5px; border: 1px solid #ccc; border-radius: 10px; background-color: #f8f9fa;">
+            <button onclick="backupTasks()" class="w-100 mb-1">💾 Backup</button>
+            <input type="file" id="backupFileInput" accept=".json" style="display: none;">
+            <button type="button" class="w-100" onclick="document.getElementById('backupFileInput').click()">📂 Importer</button>
+            <button onclick="importBackup()" class="w-100 mt-1">📥 Ajouter</button>
+            <div id="message" style="margin-top: 10px; color: green;"></div>
+      </div>
+    </div>
+
+    <div class="col-sm-10" style="background-color: rgb(131, 173, 220);">
+     
+      <div>
+        <input type="text" id="taskInput" placeholder="Entrez une tâche..." required>
+        <select id="repeatSelect">
+          <option value="day">🗓️ Jour</option>
+          <option value="daily">🗓️ Journalier</option>
+          <option value="monthly">📅 Mensuel</option>
+          <option value="yearly">🎉 Annuel</option>
+        </select>
+        <input type="date" id="dateInput">
+        <input type="time" id="reminderTimeInput">
+        <button onclick="addTask()">➕ Ajouter</button>
+      
+        🔍 <input type="text" id="searchInput" placeholder="Rechercher une tâche..." oninput="loadTasks()">
+      </div>
+
+      <div class="filter-section">
+    <div class="filter-buttons">
+      <button onclick="setFilter('all')" id="filter-all" class="active">Toutes</button>
+      <button onclick="setFilter('today')" id="filter-today">Aujourd'hui</button>
+      <button onclick="setFilter('daily')" id="filter-daily">Journalier</button>
+      <button onclick="setFilter('monthly')" id="filter-monthly">Mensuelles</button>
+      <button onclick="setFilter('yearly')" id="filter-yearly">Annuel</button>
+      <button onclick="setFilter('done')" id="filter-done">Accomplies</button>
+      <button onclick="setFilter('notDone')" id="filter-notDone">Non accomplies</button>
+    </div>
+  </div>
+
+      <div id="taskList"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  let currentFilter = 'all';
+  let tasks = JSON.parse(localStorage.getItem("tasks") || "[]");
+
+  function saveTasks() {
+    localStorage.setItem("tasks", JSON.stringify(tasks));
+  }
+
+  function setFilter(value) {
+    currentFilter = value;
+    document.querySelectorAll('.filter-buttons button').forEach(btn => btn.classList.remove('active'));
+    const activeBtn = document.getElementById('filter-' + value);
+    if (activeBtn) activeBtn.classList.add('active');
+    loadTasks();
+  }
+
+  function addTask() {
+    let text = document.getElementById("taskInput").value.trim();
+    if (!text) return;
+    text = text.charAt(0).toUpperCase() + text.slice(1);
+
+    const repeat = document.getElementById("repeatSelect").value;
+    const dueDate = document.getElementById("dateInput").value;
+    const reminderTime = document.getElementById("reminderTimeInput").value;
+
+    const task = { text, repeat, dueDate, reminderTime, completed: false, lastReminder: null };
+    tasks.push(task);
+    saveTasks();
+
+    document.getElementById("taskInput").value = "";
+    document.getElementById("dateInput").value = "";
+    document.getElementById("reminderTimeInput").value = "";
+    loadTasks();
+  }
+
+  function toggleTask(index) {
+    tasks[index].completed = !tasks[index].completed;
+    saveTasks();
+    loadTasks();
+  }
+
+  function deleteTask(index) {
+    tasks.splice(index, 1);
+    saveTasks();
+    loadTasks();
+  }
+
+  function editTask(index) {
+    const task = tasks[index];
+    const newText = prompt("Modifier la tâche :", task.text);
+    if (newText === null || newText.trim() === "") return;
+
+    task.text = newText.trim();
+    task.repeat = prompt("Rappel (daily, monthly, yearly) :", task.repeat) || task.repeat;
+    task.dueDate = prompt("Date (YYYY-MM-DD) :", task.dueDate) || task.dueDate;
+    task.reminderTime = prompt("Heure de rappel (HH:MM) :", task.reminderTime) || task.reminderTime;
+
+    saveTasks();
+    loadTasks();
+  }
+
+  function matchesFilter(task) {
+    const today = new Date().toISOString().split("T")[0];
+    if (currentFilter === "done") return task.completed;
+    if (currentFilter === "notDone") return !task.completed;
+    if (currentFilter === "today") return task.dueDate === today;
+   if (["day", "daily", "monthly", "yearly"].includes(currentFilter)) return task.repeat === currentFilter;
+    return true;
+  }
+
+  function matchesSearch(task) {
+    const search = document.getElementById("searchInput").value.toLowerCase();
+    return task.text.toLowerCase().includes(search);
+  }
+
+  function formatDate(dateString) {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('fr-FR');
+  }
+
+  function getRepeatLabel(repeat) {
+  if (repeat === "day") return "Jour";
+  if (repeat === "daily") return "Journalier";
+  if (repeat === "monthly") return "Mensuel";
+  if (repeat === "yearly") return "Annuel";
+  return "Aucun";
+}
+
+
+  function loadTasks() {
+  const taskList = document.getElementById("taskList");
+  taskList.innerHTML = "";
+
+  const search = document.getElementById("searchInput").value.toLowerCase();
+
+  const filteredTasks = tasks
+    .map((task, index) => ({ task, index })) // on garde l'index réel
+    .filter(({ task }) => matchesFilter(task) && matchesSearch(task));
+
+  filteredTasks.forEach(({ task, index }) => {
+    const taskDiv = document.createElement("div");
+    taskDiv.className = "task";
+    if (task.completed) taskDiv.classList.add("completed");
+
+    // Ajouter classes de priorité en fonction de repeat
+    if (task.repeat === "daily") taskDiv.classList.add("priority-daily");
+    if (task.repeat === "monthly") taskDiv.classList.add("priority-monthly");
+    if (task.repeat === "yearly") taskDiv.classList.add("priority-yearly");
+
+    taskDiv.innerHTML = `
+      <span>
+        ${task.text}
+        <div class="info">
+          ${task.dueDate ? `📅 ${formatDate(task.dueDate)} ` : ""}
+          ${task.repeat ? `🔁 ${getRepeatLabel(task.repeat)}` : ""}
+          ${task.reminderTime ? `⏰ ${task.reminderTime}` : ""}
+        </div>
+      </span>
+      <div class="buttons">
+        <button onclick="toggleTask(${index})">✅</button>
+        <button onclick="editTask(${index})">✏️</button>
+        <button onclick="deleteTask(${index})">🗑️</button>
+      </div>
+    `;
+
+    taskList.appendChild(taskDiv);
+  });
+  scheduleDailyNotifications(); // 📢 Planifier les notifications quotidiennes
+}
+
+function scheduleDailyNotifications() {
+  if (!("Notification" in window) || !("serviceWorker" in navigator)) return;
+
+  tasks.forEach((task) => {
+    if (task.repeat === "daily" && !task.completed) {
+      const now = new Date();
+      const due = new Date(task.dueDate || now);
+      due.setHours(9, 0, 0, 0); // 9h00
+
+      if (now > due) {
+        due.setDate(due.getDate() + 1);
+      }
+
+      const timeout = due.getTime() - now.getTime();
+
+      setTimeout(() => {
+        sendNotification(task.text);
+        setInterval(() => {
+          sendNotification(task.text);
+        }, 24 * 60 * 60 * 1000); // Chaque 24h
+      }, timeout);
+    }
+  });
+}
+
+function sendNotification(message) {
+  navigator.serviceWorker.ready.then(function(registration) {
+    registration.showNotification('Rappel quotidien 📅', {
+      body: message,
+      icon: 'icon.png',
+      badge: 'icon.png'
+    });
+  });
+}
+
+
+function showNotification(message) {
+  if (Notification.permission === "granted") {
+    new Notification("Rappel quotidien 📅", {
+      body: message,
+      icon: "icon.png" // tu peux mettre l'icône de ton app ici
+    });
+  } else if (Notification.permission !== "denied") {
+    Notification.requestPermission().then(permission => {
+      if (permission === "granted") {
+        new Notification("Rappel quotidien 📅", {
+          body: message,
+          icon: "icon.png"
+        });
+      }
+    });
+  }
+}
+
+  function checkReminders() {
+  const now = new Date();
+  const todayStr = now.toISOString().split("T")[0];
+
+  tasks.forEach(task => {
+    if (task.completed || !task.reminderTime || task.dueDate !== todayStr) return;
+
+    const [hours, minutes] = task.reminderTime.split(":").map(Number);
+    const reminderTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes);
+
+    if (
+      now >= reminderTime &&
+      (!task.lastReminder || now - new Date(task.lastReminder) > 30 * 60 * 1000)
+    ) {
+      if (task.repeat === "day" || task.repeat === "daily" || task.repeat === "monthly" || task.repeat === "yearly") {
+        alert(`🔔 Rappel: ${task.text}`);
+        task.lastReminder = new Date().toISOString();
+        saveTasks();
+      }
+    }
+  });
+}
+
+
+  // Initialisation
+  loadTasks();
+  setInterval(checkReminders, 60 * 1000); // Vérifie toutes les minutes
+  function sendDailyNotifications() {
+    const tasks = JSON.parse(localStorage.getItem("tasks")) || [];
+    const today = new Date().toLocaleDateString();
+
+    tasks.forEach(task => {
+        const taskDate = new Date(task.date).toLocaleDateString();
+        const isDaily = task.frequency === "daily"; // selon ton champ de répétition
+        const isNotDone = !task.done;
+
+        if (isDaily && isNotDone && new Date(task.date) <= new Date()) {
+            // Envoie une notification
+            if (Notification.permission === "granted") {
+                new Notification("Rappel quotidien", {
+                    body: `N'oubliez pas votre tâche : "${task.title}"`,
+                    icon: "icon.png"
+                });
+            }
+        }
+    });
+}
+
+// Demander la permission une fois
+if (Notification.permission !== "granted") {
+    Notification.requestPermission();
+}
+
+// Lancer le rappel une fois par jour
+setInterval(() => {
+    const now = new Date();
+    if (now.getHours() === 9 && now.getMinutes() === 0) { // Par exemple à 9h00 du matin
+        sendDailyNotifications();
+    }
+}, 60000); // Vérifie chaque minute si c’est 9h00
+function backupTasks() {
+    const data = JSON.stringify(tasks, null, 2);
+    const blob = new Blob([data], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "taches_backup.json";
+    a.click();
+  }
+
+  function importBackup() {
+    const input = document.getElementById("backupFileInput");
+    if (!input.files.length) return;
+    const reader = new FileReader();
+    reader.onload = function (e) {
+      try {
+        const importedTasks = JSON.parse(e.target.result);
+        if (Array.isArray(importedTasks)) {
+          tasks = importedTasks;
+          saveTasks();
+          loadTasks();
+          document.getElementById("message").innerText = "✅";
+        } else {
+          throw new Error("Format invalide");
+        }
+      } catch (err) {
+        alert("Erreur d'importation : " + err.message);
+      }
+    };
+    reader.readAsText(input.files[0]);
+  }
+// Enregistrer le Service Worker au chargement de la page
+document.addEventListener('DOMContentLoaded', () => {
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('service-worker.js')
+      .then((registration) => {
+        console.log('Service Worker enregistré avec succès ✅', registration);
+      })
+      .catch((error) => {
+        console.error('Erreur lors de l’enregistrement du Service Worker ❌', error);
+      });
+  } else {
+    console.warn('Service Worker non supporté dans ce navigateur 🚫');
+  }
+});
+
+</script>
+</div>
+</body>
+</html>
+
+
+ <!-- function backupTasks() {
+    const data = JSON.stringify(tasks, null, 2);
+    const blob = new Blob([data], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "taches_backup.json";
+    a.click();
+  }
+
+  function importBackup() {
+    const input = document.getElementById("backupFileInput");
+    if (!input.files.length) return;
+    const reader = new FileReader();
+    reader.onload = function (e) {
+      try {
+        const importedTasks = JSON.parse(e.target.result);
+        if (Array.isArray(importedTasks)) {
+          tasks = importedTasks;
+          saveTasks();
+          loadTasks();
+          document.getElementById("message").innerText = "✅";
+        } else {
+          throw new Error("Format invalide");
+        }
+      } catch (err) {
+        alert("Erreur d'importation : " + err.message);
+      }
+    };
+    reader.readAsText(input.files[0]);
+  }
+
+  loadTasks();
+  setInterval(checkReminders, 60000);
+</body>
+</html>-->
