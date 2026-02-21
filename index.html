@@ -245,7 +245,10 @@
     const dueDate = document.getElementById("dateInput").value;
     const reminderTime = document.getElementById("reminderTimeInput").value;
 
-    const task = { text, repeat, dueDate, reminderTime, completed: false, lastReminder: null };
+    // Si aucune date n'est spécifiée, utiliser la date du jour
+    const taskDate = dueDate || new Date().toISOString().split('T')[0];
+    
+    const task = { text, repeat, dueDate: taskDate, reminderTime, completed: false, lastReminder: null };
     tasks.push(task);
     saveTasks();
 
@@ -286,7 +289,7 @@
     if (currentFilter === "done") return task.completed;
     if (currentFilter === "notDone") return !task.completed;
     if (currentFilter === "today") return task.dueDate === today;
-   if (["day", "daily", "monthly", "yearly"].includes(currentFilter)) return task.repeat === currentFilter;
+    if (["day", "daily", "monthly", "yearly"].includes(currentFilter)) return task.repeat === currentFilter;
     return true;
   }
 
@@ -301,136 +304,142 @@
   }
 
   function getRepeatLabel(repeat) {
-  if (repeat === "day") return "Jour";
-  if (repeat === "daily") return "Journalier";
-  if (repeat === "monthly") return "Mensuel";
-  if (repeat === "yearly") return "Annuel";
-  return "Aucun";
-}
+    if (repeat === "day") return "Jour";
+    if (repeat === "daily") return "Journalier";
+    if (repeat === "monthly") return "Mensuel";
+    if (repeat === "yearly") return "Annuel";
+    return "Aucun";
+  }
 
+  function shouldDisplayTask(task) {
+    // Une tâche s'affiche si :
+    // 1. Elle n'est pas accomplie, ou
+    // 2. Elle est accomplie mais on est dans le filtre "done"
+    return !task.completed || currentFilter === "done";
+  }
 
   function loadTasks() {
-  const taskList = document.getElementById("taskList");
-  taskList.innerHTML = "";
+    const taskList = document.getElementById("taskList");
+    taskList.innerHTML = "";
 
-  const search = document.getElementById("searchInput").value.toLowerCase();
+    const search = document.getElementById("searchInput").value.toLowerCase();
 
-  const filteredTasks = tasks
-    .map((task, index) => ({ task, index })) // on garde l'index réel
-    .filter(({ task }) => matchesFilter(task) && matchesSearch(task));
+    const filteredTasks = tasks
+      .map((task, index) => ({ task, index })) // on garde l'index réel
+      .filter(({ task }) => matchesFilter(task) && matchesSearch(task) && shouldDisplayTask(task));
 
-  filteredTasks.forEach(({ task, index }) => {
-    const taskDiv = document.createElement("div");
-    taskDiv.className = "task";
-    if (task.completed) taskDiv.classList.add("completed");
+    filteredTasks.forEach(({ task, index }) => {
+      const taskDiv = document.createElement("div");
+      taskDiv.className = "task";
+      if (task.completed) taskDiv.classList.add("completed");
 
-    // Ajouter classes de priorité en fonction de repeat
-    if (task.repeat === "daily") taskDiv.classList.add("priority-daily");
-    if (task.repeat === "monthly") taskDiv.classList.add("priority-monthly");
-    if (task.repeat === "yearly") taskDiv.classList.add("priority-yearly");
+      // Ajouter classes de priorité en fonction de repeat
+      if (task.repeat === "daily") taskDiv.classList.add("priority-daily");
+      if (task.repeat === "monthly") taskDiv.classList.add("priority-monthly");
+      if (task.repeat === "yearly") taskDiv.classList.add("priority-yearly");
 
-    taskDiv.innerHTML = `
-      <span>
-        ${task.text}
-        <div class="info">
-          ${task.dueDate ? `📅 ${formatDate(task.dueDate)} ` : ""}
-          ${task.repeat ? `🔁 ${getRepeatLabel(task.repeat)}` : ""}
-          ${task.reminderTime ? `⏰ ${task.reminderTime}` : ""}
+      taskDiv.innerHTML = `
+        <span>
+          ${task.text}
+          <div class="info">
+            ${task.dueDate ? `📅 ${formatDate(task.dueDate)} ` : ""}
+            ${task.repeat ? `🔁 ${getRepeatLabel(task.repeat)}` : ""}
+            ${task.reminderTime ? `⏰ ${task.reminderTime}` : ""}
+          </div>
+        </span>
+        <div class="buttons">
+          <button onclick="toggleTask(${index})">✅</button>
+          <button onclick="editTask(${index})">✏️</button>
+          <button onclick="deleteTask(${index})">🗑️</button>
         </div>
-      </span>
-      <div class="buttons">
-        <button onclick="toggleTask(${index})">✅</button>
-        <button onclick="editTask(${index})">✏️</button>
-        <button onclick="deleteTask(${index})">🗑️</button>
-      </div>
-    `;
+      `;
 
-    taskList.appendChild(taskDiv);
-  });
-  scheduleDailyNotifications(); // 📢 Planifier les notifications quotidiennes
-}
+      taskList.appendChild(taskDiv);
+    });
+    scheduleDailyNotifications(); // 📢 Planifier les notifications quotidiennes
+  }
 
-function scheduleDailyNotifications() {
-  if (!("Notification" in window) || !("serviceWorker" in navigator)) return;
+  function scheduleDailyNotifications() {
+    if (!("Notification" in window) || !("serviceWorker" in navigator)) return;
 
-  tasks.forEach((task) => {
-    if (task.repeat === "daily" && !task.completed) {
-      const now = new Date();
-      const due = new Date(task.dueDate || now);
-      due.setHours(9, 0, 0, 0); // 9h00
+    tasks.forEach((task) => {
+      if (task.repeat === "daily" && !task.completed) {
+        const now = new Date();
+        const due = new Date(task.dueDate || now);
+        due.setHours(9, 0, 0, 0); // 9h00
 
-      if (now > due) {
-        due.setDate(due.getDate() + 1);
-      }
+        if (now > due) {
+          due.setDate(due.getDate() + 1);
+        }
 
-      const timeout = due.getTime() - now.getTime();
+        const timeout = due.getTime() - now.getTime();
 
-      setTimeout(() => {
-        sendNotification(task.text);
-        setInterval(() => {
+        setTimeout(() => {
           sendNotification(task.text);
-        }, 24 * 60 * 60 * 1000); // Chaque 24h
-      }, timeout);
-    }
-  });
-}
-
-function sendNotification(message) {
-  navigator.serviceWorker.ready.then(function(registration) {
-    registration.showNotification('Rappel quotidien 📅', {
-      body: message,
-      icon: 'icon.png',
-      badge: 'icon.png'
-    });
-  });
-}
-
-
-function showNotification(message) {
-  if (Notification.permission === "granted") {
-    new Notification("Rappel quotidien 📅", {
-      body: message,
-      icon: "icon.png" // tu peux mettre l'icône de ton app ici
-    });
-  } else if (Notification.permission !== "denied") {
-    Notification.requestPermission().then(permission => {
-      if (permission === "granted") {
-        new Notification("Rappel quotidien 📅", {
-          body: message,
-          icon: "icon.png"
-        });
+          setInterval(() => {
+            sendNotification(task.text);
+          }, 24 * 60 * 60 * 1000); // Chaque 24h
+        }, timeout);
       }
     });
   }
-}
+
+  function sendNotification(message) {
+    navigator.serviceWorker.ready.then(function(registration) {
+      registration.showNotification('Rappel quotidien 📅', {
+        body: message,
+        icon: 'icon.png',
+        badge: 'icon.png'
+      });
+    });
+  }
+
+  function showNotification(message) {
+    if (Notification.permission === "granted") {
+      new Notification("Rappel quotidien 📅", {
+        body: message,
+        icon: "icon.png" // tu peux mettre l'icône de ton app ici
+      });
+    } else if (Notification.permission !== "denied") {
+      Notification.requestPermission().then(permission => {
+        if (permission === "granted") {
+          new Notification("Rappel quotidien 📅", {
+            body: message,
+            icon: "icon.png"
+          });
+        }
+      });
+    }
+  }
 
   function checkReminders() {
-  const now = new Date();
-  const todayStr = now.toISOString().split("T")[0];
+    const now = new Date();
+    const todayStr = now.toISOString().split("T")[0];
 
-  tasks.forEach(task => {
-    if (task.completed || !task.reminderTime || task.dueDate !== todayStr) return;
+    tasks.forEach(task => {
+      // Ne pas envoyer de rappel si la tâche est accomplie
+      if (task.completed || !task.reminderTime) return;
 
-    const [hours, minutes] = task.reminderTime.split(":").map(Number);
-    const reminderTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes);
+      const [hours, minutes] = task.reminderTime.split(":").map(Number);
+      const reminderTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes);
 
-    if (
-      now >= reminderTime &&
-      (!task.lastReminder || now - new Date(task.lastReminder) > 30 * 60 * 1000)
-    ) {
-      if (task.repeat === "day" || task.repeat === "daily" || task.repeat === "monthly" || task.repeat === "yearly") {
+      // Vérifier si c'est l'heure du rappel (indépendamment de la date)
+      if (
+        now.getHours() === hours && 
+        now.getMinutes() === minutes &&
+        (!task.lastReminder || now - new Date(task.lastReminder) > 12 * 60 * 60 * 1000) // Max 1 fois par 12h
+      ) {
         alert(`🔔 Rappel: ${task.text}`);
         task.lastReminder = new Date().toISOString();
         saveTasks();
       }
-    }
-  });
-}
-
+    });
+  }
 
   // Initialisation
   loadTasks();
   setInterval(checkReminders, 60 * 1000); // Vérifie toutes les minutes
+  
   function sendDailyNotifications() {
     const tasks = JSON.parse(localStorage.getItem("tasks")) || [];
     const today = new Date().toLocaleDateString();
@@ -450,21 +459,22 @@ function showNotification(message) {
             }
         }
     });
-}
+  }
 
-// Demander la permission une fois
-if (Notification.permission !== "granted") {
+  // Demander la permission une fois
+  if (Notification.permission !== "granted") {
     Notification.requestPermission();
-}
+  }
 
-// Lancer le rappel une fois par jour
-setInterval(() => {
+  // Lancer le rappel une fois par jour
+  setInterval(() => {
     const now = new Date();
     if (now.getHours() === 9 && now.getMinutes() === 0) { // Par exemple à 9h00 du matin
         sendDailyNotifications();
     }
-}, 60000); // Vérifie chaque minute si c’est 9h00
-function backupTasks() {
+  }, 60000); // Vérifie chaque minute si c’est 9h00
+  
+  function backupTasks() {
     const data = JSON.stringify(tasks, null, 2);
     const blob = new Blob([data], { type: "application/json" });
     const a = document.createElement("a");
@@ -494,60 +504,23 @@ function backupTasks() {
     };
     reader.readAsText(input.files[0]);
   }
-// Enregistrer le Service Worker au chargement de la page
-document.addEventListener('DOMContentLoaded', () => {
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('service-worker.js')
-      .then((registration) => {
-        console.log('Service Worker enregistré avec succès ✅', registration);
-      })
-      .catch((error) => {
-        console.error('Erreur lors de l’enregistrement du Service Worker ❌', error);
-      });
-  } else {
-    console.warn('Service Worker non supporté dans ce navigateur 🚫');
-  }
-});
+  
+  // Enregistrer le Service Worker au chargement de la page
+  document.addEventListener('DOMContentLoaded', () => {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('service-worker.js')
+        .then((registration) => {
+          console.log('Service Worker enregistré avec succès ✅', registration);
+        })
+        .catch((error) => {
+          console.error('Erreur lors de l’enregistrement du Service Worker ❌', error);
+        });
+    } else {
+      console.warn('Service Worker non supporté dans ce navigateur 🚫');
+    }
+  });
 
 </script>
 </div>
 </body>
 </html>
-
-
- <!-- function backupTasks() {
-    const data = JSON.stringify(tasks, null, 2);
-    const blob = new Blob([data], { type: "application/json" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = "taches_backup.json";
-    a.click();
-  }
-
-  function importBackup() {
-    const input = document.getElementById("backupFileInput");
-    if (!input.files.length) return;
-    const reader = new FileReader();
-    reader.onload = function (e) {
-      try {
-        const importedTasks = JSON.parse(e.target.result);
-        if (Array.isArray(importedTasks)) {
-          tasks = importedTasks;
-          saveTasks();
-          loadTasks();
-          document.getElementById("message").innerText = "✅";
-        } else {
-          throw new Error("Format invalide");
-        }
-      } catch (err) {
-        alert("Erreur d'importation : " + err.message);
-      }
-    };
-    reader.readAsText(input.files[0]);
-  }
-
-  loadTasks();
-  setInterval(checkReminders, 60000);
-</body>
-</html>-->
-
