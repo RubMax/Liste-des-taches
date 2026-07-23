@@ -712,6 +712,39 @@ setInterval(() => {
   autoBackupTasks(); // Sauvegarde locale
   saveToGoogleDrive(); // Sauvegarde Google Drive
 }, BACKUP_INTERVAL_MS);
+
+
+
+
+  // Version compatible GitHub Pages
+function saveToGoogleDrive2() {
+  const data = { tasks: tasks, timestamp: new Date().toISOString() };
+  
+  // Créer un formulaire pour envoyer les données
+  const form = document.createElement('form');
+  form.method = 'POST';
+  form.action = APPS_SCRIPT_URL;
+  form.target = 'hidden_iframe';
+  
+  const input = document.createElement('input');
+  input.type = 'hidden';
+  input.name = 'data';
+  input.value = JSON.stringify(data);
+  form.appendChild(input);
+  
+  // Iframe caché pour la réponse
+  const iframe = document.createElement('iframe');
+  iframe.name = 'hidden_iframe';
+  iframe.style.display = 'none';
+  document.body.appendChild(iframe);
+  
+  form.submit();
+  
+  setTimeout(() => {
+    document.body.removeChild(form);
+    document.body.removeChild(iframe);
+  }, 1000);
+}
 </script>
 </div>
 </body>
