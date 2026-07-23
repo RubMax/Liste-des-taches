@@ -368,6 +368,7 @@
           // Marquer comme envoyé
           task.lastReminder = new Date().toISOString();
           saveTasks();
+          saveToGoogleDrive();
           
           // Afficher aussi dans la liste des tâches
           const taskList = document.getElementById("taskList");
@@ -507,6 +508,7 @@
     const activeBtn = document.getElementById('filter-' + value);
     if (activeBtn) activeBtn.classList.add('active');
     loadTasks();
+    saveToGoogleDrive();
   }
 
   function addTask() {
@@ -522,23 +524,27 @@
     const task = { text, repeat, dueDate: taskDate, reminderTime, completed: false, lastReminder: null };
     tasks.push(task);
     saveTasks();
+    saveToGoogleDrive();
 
     document.getElementById("taskInput").value = "";
     document.getElementById("dateInput").value = "";
     document.getElementById("reminderTimeInput").value = "";
     loadTasks();
+    saveToGoogleDrive();
   }
 
   function toggleTask(index) {
     tasks[index].completed = !tasks[index].completed;
     saveTasks();
-    loadTasks();
+    loadTasks();        // Sauvegarde locale
+    saveToGoogleDrive();  // Sauvegarde sur Google Drive
   }
 
   function deleteTask(index) {
     tasks.splice(index, 1);
     saveTasks();
-    loadTasks();
+    loadTasks();        // Sauvegarde locale
+    saveToGoogleDrive();  // Sauvegarde sur Google Drive
   }
 
   function editTask(index) {
@@ -552,7 +558,8 @@
     task.reminderTime = prompt("Heure de rappel (HH:MM) :", task.reminderTime) || task.reminderTime;
 
     saveTasks();
-    loadTasks();
+    loadTasks();         // Sauvegarde locale
+    saveToGoogleDrive();  // Sauvegarde sur Google Drive
   }
 
   function matchesFilter(task) {
@@ -623,6 +630,8 @@
 
       taskList.appendChild(taskDiv);
     });
+    saveTasks();          // Sauvegarde locale
+    saveToGoogleDrive();  // Sauvegarde sur Google Drive
   }
 
   function backupTasks() {
@@ -718,36 +727,43 @@ setInterval(() => {
 // === SAUVEGARDE VERS GOOGLE DRIVE ===
 const DRIVE_FOLDER_ID = "1tj3sr5iVP7t4CbNHac3xawSAOze24Fy2";
 
-function saveToGoogleDrive() {
-  const data = JSON.stringify(tasks, null, 2);
-  
-  // Créer un formulaire pour envoyer les données
-  const form = document.createElement('form');
-  form.method = 'POST';
-  form.action = 'https://script.google.com/macros/s/AKfycbzUsXFGy0QNc9yzoLXMWxO2pK5UnQAjhCu83D_QgoWJXnkp_6oJKWRkU32VFpY8yVeBzQ/exec'; // À remplacer par l'URL de votre script
-  form.target = 'hidden_iframe';
-  
-  const input = document.createElement('input');
-  input.type = 'hidden';
-  input.name = 'data';
-  input.value = data;
-  form.appendChild(input);
-  
-  // Iframe caché pour la réponse
-  const iframe = document.createElement('iframe');
-  iframe.name = 'hidden_iframe';
-  iframe.style.display = 'none';
-  document.body.appendChild(iframe);
-  
-  form.submit();
-  console.log("✅ Sauvegarde envoyée vers Google Drive");
-  
-  setTimeout(() => {
-    document.body.removeChild(form);
-    document.body.removeChild(iframe);
-  }, 1000);
-}
+async function saveToGoogleDrive() {
 
+    try{
+
+        const response = await fetch("VOTRE_URL_WEBAPP",{
+
+            method:"POST",
+
+            headers:{
+                "Content-Type":"application/json"
+            },
+
+            body:JSON.stringify(tasks)
+
+        });
+
+        const result = await response.json();
+
+        console.log(result);
+
+        if(result.success){
+
+            console.log("✅ Sauvegarde Drive OK");
+
+        }else{
+
+            console.error(result.error);
+
+        }
+
+    }catch(err){
+
+        console.error(err);
+
+    }
+
+}
 // Modifier la fonction de sauvegarde automatique
 function autoBackupTasks() {
   // 1. Sauvegarde locale (dossier Téléchargements)
