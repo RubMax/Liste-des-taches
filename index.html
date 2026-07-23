@@ -25,13 +25,13 @@
   max-width: 95%;
   background: white;
   border-radius: 20px;
-  overflow: hidden; /* si tu veux encore masquer le scroll interne */
+  overflow: hidden;
 }
 
 
     .container-fluid {
-          min-height: 100vh; /* prend toute la hauteur de l'écran */
-          border-radius: 20px; /* ✅ arrondit les 4 coins */
+          min-height: 100vh;
+          border-radius: 20px;
         }
 
     h6 {
@@ -62,10 +62,10 @@
   color: white;
   border: none;
   transition: background-color 0.3s ease;
-  padding: 2px 6px;          /* ✅ réduit la taille interne du bouton */
-  font-size: 12px;           /* ✅ texte plus petit */
-  line-height: 1;            /* ✅ hauteur de ligne compacte */
-  border-radius: 4px;        /* optionnel : léger arrondi */
+  padding: 2px 6px;
+  font-size: 12px;
+  line-height: 1;
+  border-radius: 4px;
   display: inline-block;
 }
 
@@ -106,9 +106,9 @@
     #taskList {
       font-size: 15px;
       margin-top: 8px;
-    min-height: 400px; /* Hauteur minimale même s'il n'y a pas de tâches */
-    max-height: 300px; /* Limite la hauteur si trop de tâches */
-    overflow-y: auto;  /* Scroll uniquement si dépasse la hauteur */
+    min-height: 400px;
+    max-height: 300px;
+    overflow-y: auto;
     background-color: #f8f9fa;
     border-radius: 10px;
     padding: 10px;
@@ -146,16 +146,31 @@
     }
 
     .search-section .icon {
-          font-size: 14px; /* Ajuste la taille ici */
+          font-size: 14px;
         }
             .image-container {
-          text-align: center; /* Centrer les images */
+          text-align: center;
         }
 
         .image-container img {
-          width: 400px; /* Ajuste la taille selon ce que tu veux */
+          width: 400px;
           height: 90px;
-          margin-bottom: 0px; /* Marge entre les images */
+          margin-bottom: 0px;
+        }
+
+        /* Style pour les notifications dans la page */
+        .notification-banner {
+          position: fixed;
+          top: 20px;
+          right: 20px;
+          z-index: 9999;
+          max-width: 400px;
+          animation: slideIn 0.5s ease;
+        }
+        
+        @keyframes slideIn {
+          from { transform: translateX(100%); opacity: 0; }
+          to { transform: translateX(0); opacity: 1; }
         }
 
   </style>
@@ -220,118 +235,272 @@
   </div>
 </div>
 
+<!-- Zone pour les notifications dans la page -->
+<div id="notificationContainer" class="notification-banner"></div>
+
 <script>
   let currentFilter = 'all';
   let tasks = JSON.parse(localStorage.getItem("tasks") || "[]");
 
   // === SAUVEGARDE AUTOMATIQUE TOUTES LES 5 HEURES ===
-  const BACKUP_INTERVAL_MS = 5 * 60 * 60 * 1000; // 5 heures en millisecondes
+  const BACKUP_INTERVAL_MS = 5 * 60 * 60 * 1000;
   const BACKUP_FILENAME = "taches_backup.json";
 
   function saveTasks() {
     localStorage.setItem("tasks", JSON.stringify(tasks));
   }
 
-  // Fonction de sauvegarde automatique qui remplace le fichier existant
   function autoBackupTasks() {
     const data = JSON.stringify(tasks, null, 2);
     const blob = new Blob([data], { type: "application/json" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = BACKUP_FILENAME; // Même nom fixe → remplace l'ancien
+    a.download = BACKUP_FILENAME;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-    console.log("✅ Sauvegarde automatique effectuée à", new Date().toLocaleString());
+    console.log("✅ Sauvegarde auto à", new Date().toLocaleString());
   }
 
-  // Démarrer le timer de sauvegarde automatique
   setInterval(autoBackupTasks, BACKUP_INTERVAL_MS);
 
-  // === NOTIFICATIONS QUI S'AFFICHENT EN PREMIER PLAN ===
-  // Demander la permission dès le chargement
-  if (Notification.permission === "default") {
-    Notification.requestPermission();
-  }
-
-  // Fonction améliorée pour envoyer des notifications système
-  function sendSystemNotification(title, message, taskId = null) {
-    // Vérifier si la permission est accordée
-    if (Notification.permission === "granted") {
-      const options = {
-        body: message,
-        icon: "🔔", // Emoji comme icône
-        tag: taskId || "task-reminder", // Évite les doublons
-        requireInteraction: true, // ⚠️ RESTE À L'ÉCRAN jusqu'à interaction
-        silent: false,
-        vibrate: [200, 100, 200], // Vibration sur mobile
-        data: {
-          taskId: taskId,
-          url: window.location.href
-        }
-      };
-
-      const notification = new Notification(title, options);
-      
-      // Rediriger vers la page quand on clique sur la notification
-      notification.onclick = function(event) {
-        event.preventDefault();
-        window.focus();
-        // Si la page est déjà ouverte, on la met en avant
-        if (window.parent) {
-          window.parent.focus();
-        }
-        notification.close();
-      };
-
-      return notification;
-    } else if (Notification.permission === "denied") {
-      // Fallback: alerte classique si les notifications sont bloquées
-      alert(`🔔 ${title}\n${message}`);
-    } else {
-      // Demander la permission si ce n'est pas encore fait
-      Notification.requestPermission().then(permission => {
-        if (permission === "granted") {
-          sendSystemNotification(title, message, taskId);
-        } else {
-          alert(`🔔 ${title}\n${message}`);
+  // === GESTION UNIVERSELLE DES NOTIFICATIONS ===
+  
+  // Version compatible avec TOUS les navigateurs Chrome
+  function sendNotification(title, message) {
+    // 1️⃣ Méthode 1: Service Worker (la meilleure, fonctionne même en arrière-plan)
+    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+      navigator.serviceWorker.ready.then(function(registration) {
+        try {
+          registration.showNotification(title || '🔔 Rappel', {
+            body: message || 'Tâche en attente',
+            icon: 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/img/bootstrap-logo.svg',
+            badge: 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/img/bootstrap-logo.svg',
+            vibrate: [200, 100, 200],
+            requireInteraction: true,
+            tag: 'reminder-' + Date.now(),
+            data: {
+              url: window.location.href,
+              time: new Date().toISOString()
+            }
+          });
+          return true;
+        } catch(e) {
+          console.warn('SW notification error:', e);
         }
       });
     }
+
+    // 2️⃣ Méthode 2: Notification API (fallback pour Chrome sans SW)
+    if ('Notification' in window && Notification.permission === 'granted') {
+      try {
+        const notification = new Notification(title || '🔔 Rappel', {
+          body: message || 'Tâche en attente',
+          icon: 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/img/bootstrap-logo.svg',
+          requireInteraction: true,
+          tag: 'reminder-' + Date.now()
+        });
+        
+        notification.onclick = function() {
+          window.focus();
+          this.close();
+        };
+        
+        return true;
+      } catch(e) {
+        console.warn('Notification API error:', e);
+      }
+    }
+
+    // 3️⃣ Méthode 3: Affichage dans la page (fallback ultime)
+    showInPageNotification(title, message);
+    return false;
   }
 
-  // Fonction pour vérifier les rappels avec notification système
+  // Affichage dans la page (fonctionne toujours)
+  function showInPageNotification(title, message) {
+    const container = document.getElementById('notificationContainer');
+    if (!container) return;
+
+    const notif = document.createElement('div');
+    notif.className = 'alert alert-warning alert-dismissible fade show';
+    notif.style.backgroundColor = '#fff3cd';
+    notif.style.borderLeft = '4px solid #ffc107';
+    notif.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+    notif.innerHTML = `
+      <strong>${title || '🔔 Rappel'}</strong><br>
+      ${message || 'Tâche en attente'}
+      <button type="button" class="btn-close" data-bs-dismiss="alert" onclick="this.parentElement.remove()"></button>
+    `;
+    
+    container.appendChild(notif);
+    
+    // Auto-supprimer après 30 secondes
+    setTimeout(() => {
+      if (notif.parentElement) notif.remove();
+    }, 30000);
+  }
+
+  // === VÉRIFICATION DES RAPPELS AMÉLIORÉE ===
   function checkReminders() {
     const now = new Date();
-    const todayStr = now.toISOString().split("T")[0];
+    const currentMinutes = now.getHours() * 60 + now.getMinutes();
 
     tasks.forEach((task, index) => {
+      // Ignorer les tâches accomplies ou sans heure de rappel
       if (task.completed || !task.reminderTime) return;
 
       const [hours, minutes] = task.reminderTime.split(":").map(Number);
+      const reminderMinutes = hours * 60 + minutes;
       
-      // Vérifier si c'est l'heure du rappel
-      if (
-        now.getHours() === hours && 
-        now.getMinutes() === minutes &&
-        (!task.lastReminder || now - new Date(task.lastReminder) > 12 * 60 * 60 * 1000)
-      ) {
-        // Envoyer une notification système au lieu d'un simple alert()
-        sendSystemNotification(
-          "⏰ Rappel de tâche",
-          `${task.text}${task.dueDate ? ` (à faire pour le ${formatDate(task.dueDate)})` : ''}`,
-          `task-${index}`
-        );
+      // Marge de 2 minutes pour être plus tolérant
+      if (Math.abs(currentMinutes - reminderMinutes) <= 2) {
+        const lastReminder = task.lastReminder ? new Date(task.lastReminder) : null;
+        const nowTime = now.getTime();
         
-        task.lastReminder = new Date().toISOString();
-        saveTasks();
+        // Ne pas envoyer plus d'une fois par heure
+        if (!lastReminder || (nowTime - lastReminder.getTime()) > 60 * 60 * 1000) {
+          
+          // Envoyer la notification avec les 3 méthodes
+          sendNotification('🔔 Rappel de tâche', task.text);
+          
+          // Marquer comme envoyé
+          task.lastReminder = new Date().toISOString();
+          saveTasks();
+          
+          // Afficher aussi dans la liste des tâches
+          const taskList = document.getElementById("taskList");
+          if (taskList) {
+            const flashMsg = document.createElement("div");
+            flashMsg.className = "alert alert-warning alert-dismissible fade show mt-2";
+            flashMsg.innerHTML = `
+              <strong>🔔 Rappel :</strong> ${task.text}
+              <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            taskList.parentNode.insertBefore(flashMsg, taskList);
+            setTimeout(() => {
+              if (flashMsg.parentElement) flashMsg.remove();
+            }, 15000);
+          }
+        }
       }
     });
   }
 
-  // === FIN DES MODIFICATIONS POUR NOTIFICATIONS ===
+  // === SERVICE WORKER - ENREGISTREMENT AMÉLIORÉ ===
+  function registerServiceWorker() {
+    if (!('serviceWorker' in navigator)) {
+      console.warn('⚠️ Service Worker non supporté par ce navigateur');
+      // Demander la permission pour les notifications classiques
+      requestNotificationPermission();
+      return;
+    }
 
+    // Essayer d'enregistrer depuis un fichier externe
+    navigator.serviceWorker.register('service-worker.js')
+      .then(function(registration) {
+        console.log('✅ Service Worker enregistré avec succès');
+        
+        // Demander la permission après enregistrement
+        requestNotificationPermission();
+        
+        // Vérifier les mises à jour
+        registration.update();
+      })
+      .catch(function(error) {
+        console.warn('⚠️ Échec de l\'enregistrement SW, utilisation du fallback:', error);
+        
+        // Fallback: enregistrer un SW inline
+        registerInlineServiceWorker();
+      });
+  }
+
+  // Service Worker inline (fallback)
+  function registerInlineServiceWorker() {
+    const swCode = `
+      self.addEventListener('install', function(e) {
+        self.skipWaiting();
+      });
+
+      self.addEventListener('activate', function(e) {
+        e.waitUntil(clients.claim());
+      });
+
+      self.addEventListener('notificationclick', function(e) {
+        e.notification.close();
+        e.waitUntil(
+          clients.matchAll({ type: 'window' }).then(function(clientList) {
+            for (var i = 0; i < clientList.length; i++) {
+              var client = clientList[i];
+              if (client.url && 'focus' in client) {
+                return client.focus();
+              }
+            }
+            if (clients.openWindow) {
+              return clients.openWindow(e.notification.data?.url || '/');
+            }
+          })
+        );
+      });
+    `;
+
+    try {
+      const swBlob = new Blob([swCode], { type: 'application/javascript' });
+      const swUrl = URL.createObjectURL(swBlob);
+      
+      navigator.serviceWorker.register(swUrl)
+        .then(function(registration) {
+          console.log('✅ Service Worker inline enregistré');
+          requestNotificationPermission();
+          setTimeout(() => URL.revokeObjectURL(swUrl), 1000);
+        })
+        .catch(function(err) {
+          console.warn('⚠️ Échec du SW inline, utilisation des notifications classiques');
+          requestNotificationPermission();
+        });
+    } catch(e) {
+      console.warn('⚠️ Erreur SW inline:', e);
+      requestNotificationPermission();
+    }
+  }
+
+  // Demander la permission pour les notifications
+  function requestNotificationPermission() {
+    if (!('Notification' in window)) {
+      console.warn('⚠️ Notifications non supportées');
+      return;
+    }
+
+    if (Notification.permission === 'granted') {
+      console.log('✅ Permission notifications accordée');
+      return;
+    }
+
+    if (Notification.permission === 'denied') {
+      console.warn('⚠️ Permission notifications refusée');
+      return;
+    }
+
+    // Demander la permission
+    Notification.requestPermission()
+      .then(function(permission) {
+        if (permission === 'granted') {
+          console.log('✅ Permission notifications accordée par l\'utilisateur');
+          // Envoyer une notification de test
+          setTimeout(() => {
+            sendNotification('✅ Notifications activées', 'Vous recevrez les rappels de tâches');
+          }, 1000);
+        } else {
+          console.warn('⚠️ Permission notifications refusée');
+        }
+      })
+      .catch(function(err) {
+        console.warn('⚠️ Erreur demande permission:', err);
+      });
+  }
+
+  // === AUTRES FONCTIONS ===
   function setFilter(value) {
     currentFilter = value;
     document.querySelectorAll('.filter-buttons button').forEach(btn => btn.classList.remove('active'));
@@ -348,7 +517,6 @@
     const repeat = document.getElementById("repeatSelect").value;
     const dueDate = document.getElementById("dateInput").value;
     const reminderTime = document.getElementById("reminderTimeInput").value;
-
     const taskDate = dueDate || new Date().toISOString().split('T')[0];
     
     const task = { text, repeat, dueDate: taskDate, reminderTime, completed: false, lastReminder: null };
@@ -457,35 +625,6 @@
     });
   }
 
-  // Notification quotidienne pour les tâches journalières
-  function sendDailyNotifications() {
-    const today = new Date().toISOString().split("T")[0];
-    
-    tasks.forEach((task, index) => {
-      if (task.repeat === "daily" && !task.completed && task.dueDate <= today) {
-        sendSystemNotification(
-          "📅 Tâche quotidienne",
-          `N'oubliez pas : "${task.text}"`,
-          `daily-${index}`
-        );
-      }
-    });
-  }
-
-  // Démarrer la vérification des rappels toutes les 30 secondes (plus réactif)
-  setInterval(checkReminders, 30 * 1000);
-
-  // Vérifier les tâches quotidiennes à 9h00
-  setInterval(() => {
-    const now = new Date();
-    if (now.getHours() === 9 && now.getMinutes() === 0) {
-      sendDailyNotifications();
-    }
-  }, 60000);
-
-  // Initialisation
-  loadTasks();
-
   function backupTasks() {
     const data = JSON.stringify(tasks, null, 2);
     const blob = new Blob([data], { type: "application/json" });
@@ -506,7 +645,8 @@
           tasks = importedTasks;
           saveTasks();
           loadTasks();
-          document.getElementById("message").innerText = "✅";
+          document.getElementById("message").innerText = "✅ Importé avec succès !";
+          setTimeout(() => document.getElementById("message").innerText = "", 3000);
         } else {
           throw new Error("Format invalide");
         }
@@ -516,20 +656,27 @@
     };
     reader.readAsText(input.files[0]);
   }
-  
-  // Enregistrer le Service Worker au chargement de la page
-  document.addEventListener('DOMContentLoaded', () => {
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('service-worker.js')
-        .then((registration) => {
-          console.log('Service Worker enregistré avec succès ✅', registration);
-        })
-        .catch((error) => {
-          console.error('Erreur lors de l’enregistrement du Service Worker ❌', error);
-        });
-    } else {
-      console.warn('Service Worker non supporté dans ce navigateur 🚫');
+
+  // === INITIALISATION ===
+  document.addEventListener('DOMContentLoaded', function() {
+    // 1. Enregistrer le Service Worker
+    registerServiceWorker();
+
+    // 2. Charger les tâches
+    loadTasks();
+
+    // 3. Vérifier les rappels toutes les 30 secondes
+    setInterval(checkReminders, 30000);
+    
+    // 4. Vérification immédiate
+    setTimeout(checkReminders, 2000);
+
+    // 5. Vérifier si la page a été ouverte depuis une notification
+    if (window.location.search.includes('from=notification')) {
+      showInPageNotification('👋 Bienvenue', 'Vous avez été redirigé depuis une notification');
     }
+
+    console.log("✅ Application chargée avec notifications universelles");
   });
 
 </script>
