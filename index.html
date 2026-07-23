@@ -225,176 +225,113 @@
   let tasks = JSON.parse(localStorage.getItem("tasks") || "[]");
 
   // === SAUVEGARDE AUTOMATIQUE TOUTES LES 5 HEURES ===
-  const BACKUP_INTERVAL_MS = 5 * 60 * 60 * 1000; // 5 heures
+  const BACKUP_INTERVAL_MS = 5 * 60 * 60 * 1000; // 5 heures en millisecondes
   const BACKUP_FILENAME = "taches_backup.json";
 
   function saveTasks() {
     localStorage.setItem("tasks", JSON.stringify(tasks));
   }
 
+  // Fonction de sauvegarde automatique qui remplace le fichier existant
   function autoBackupTasks() {
     const data = JSON.stringify(tasks, null, 2);
     const blob = new Blob([data], { type: "application/json" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = BACKUP_FILENAME;
+    a.download = BACKUP_FILENAME; // Même nom fixe → remplace l'ancien
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-    console.log("✅ Sauvegarde auto à", new Date().toLocaleString());
+    console.log("✅ Sauvegarde automatique effectuée à", new Date().toLocaleString());
   }
 
+  // Démarrer le timer de sauvegarde automatique
   setInterval(autoBackupTasks, BACKUP_INTERVAL_MS);
 
-  // === FONCTIONS DE NOTIFICATION AVEC SERVICE WORKER ===
-  
+  // === NOTIFICATIONS QUI S'AFFICHENT EN PREMIER PLAN ===
   // Demander la permission dès le chargement
-  if ("Notification" in window && Notification.permission === "default") {
+  if (Notification.permission === "default") {
     Notification.requestPermission();
   }
 
-  // Envoyer une notification avec Service Worker
-  function sendNotification(message, taskText) {
-    // Vérifier si le Service Worker est prêt
-    if ("serviceWorker" in navigator && navigator.serviceWorker.controller) {
-      navigator.serviceWorker.ready.then(function(registration) {
-        registration.showNotification('🔔 Rappel de tâche', {
-          body: taskText || message,
-          icon: 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/img/bootstrap-logo.svg',
-          badge: 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/img/bootstrap-logo.svg',
-          vibrate: [200, 100, 200],
-          requireInteraction: true, // 🔥 Reste à l'écran jusqu'à interaction
-          tag: 'task-reminder-' + Date.now(),
-          data: {
-            url: window.location.href
-          }
-        });
-      });
-    } else if ("Notification" in window && Notification.permission === "granted") {
-      // Fallback si SW pas disponible
-      const notification = new Notification('🔔 Rappel de tâche', {
-        body: taskText || message,
-        icon: 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/img/bootstrap-logo.svg',
-        requireInteraction: true,
-        tag: 'task-reminder-' + Date.now()
-      });
+  // Fonction améliorée pour envoyer des notifications système
+  function sendSystemNotification(title, message, taskId = null) {
+    // Vérifier si la permission est accordée
+    if (Notification.permission === "granted") {
+      const options = {
+        body: message,
+        icon: "🔔", // Emoji comme icône
+        tag: taskId || "task-reminder", // Évite les doublons
+        requireInteraction: true, // ⚠️ RESTE À L'ÉCRAN jusqu'à interaction
+        silent: false,
+        vibrate: [200, 100, 200], // Vibration sur mobile
+        data: {
+          taskId: taskId,
+          url: window.location.href
+        }
+      };
+
+      const notification = new Notification(title, options);
       
-      // Rediriger vers la page au clic sur la notification
-      notification.onclick = function() {
+      // Rediriger vers la page quand on clique sur la notification
+      notification.onclick = function(event) {
+        event.preventDefault();
         window.focus();
+        // Si la page est déjà ouverte, on la met en avant
+        if (window.parent) {
+          window.parent.focus();
+        }
         notification.close();
       };
+
+      return notification;
+    } else if (Notification.permission === "denied") {
+      // Fallback: alerte classique si les notifications sont bloquées
+      alert(`🔔 ${title}\n${message}`);
+    } else {
+      // Demander la permission si ce n'est pas encore fait
+      Notification.requestPermission().then(permission => {
+        if (permission === "granted") {
+          sendSystemNotification(title, message, taskId);
+        } else {
+          alert(`🔔 ${title}\n${message}`);
+        }
+      });
     }
   }
 
-  // === VÉRIFICATION DES RAPPELS (avec notifications au lieu de alert) ===
+  // Fonction pour vérifier les rappels avec notification système
   function checkReminders() {
     const now = new Date();
-    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+    const todayStr = now.toISOString().split("T")[0];
 
     tasks.forEach((task, index) => {
       if (task.completed || !task.reminderTime) return;
 
       const [hours, minutes] = task.reminderTime.split(":").map(Number);
-      const reminderMinutes = hours * 60 + minutes;
       
-      // Vérifier si on est à l'heure du rappel (marge de 1 minute)
-      if (Math.abs(currentMinutes - reminderMinutes) <= 1) {
-        const lastReminder = task.lastReminder ? new Date(task.lastReminder) : null;
-        const nowTime = now.getTime();
+      // Vérifier si c'est l'heure du rappel
+      if (
+        now.getHours() === hours && 
+        now.getMinutes() === minutes &&
+        (!task.lastReminder || now - new Date(task.lastReminder) > 12 * 60 * 60 * 1000)
+      ) {
+        // Envoyer une notification système au lieu d'un simple alert()
+        sendSystemNotification(
+          "⏰ Rappel de tâche",
+          `${task.text}${task.dueDate ? ` (à faire pour le ${formatDate(task.dueDate)})` : ''}`,
+          `task-${index}`
+        );
         
-        // Ne pas envoyer plus d'une fois par heure
-        if (!lastReminder || (nowTime - lastReminder.getTime()) > 60 * 60 * 1000) {
-          // Envoyer la notification
-          sendNotification("Tâche en attente", task.text);
-          
-          // Marquer comme envoyé
-          task.lastReminder = new Date().toISOString();
-          saveTasks();
-          
-          // Afficher aussi dans la page si elle est ouverte
-          const taskList = document.getElementById("taskList");
-          if (taskList) {
-            const flashMsg = document.createElement("div");
-            flashMsg.className = "alert alert-warning alert-dismissible fade show mt-2";
-            flashMsg.innerHTML = `
-              <strong>🔔 Rappel :</strong> ${task.text}
-              <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            `;
-            taskList.parentNode.insertBefore(flashMsg, taskList);
-            setTimeout(() => flashMsg.remove(), 10000);
-          }
-        }
+        task.lastReminder = new Date().toISOString();
+        saveTasks();
       }
     });
   }
 
-  // === SERVICE WORKER POUR LES NOTIFICATIONS EN ARRIÈRE-PLAN ===
-  // Ce code crée un Service Worker dynamique
-  function registerServiceWorker() {
-    if (!('serviceWorker' in navigator)) {
-      console.warn('Service Worker non supporté');
-      return;
-    }
+  // === FIN DES MODIFICATIONS POUR NOTIFICATIONS ===
 
-    // Code du Service Worker en tant que chaîne
-    const swCode = `
-      self.addEventListener('install', function(e) {
-        self.skipWaiting();
-      });
-
-      self.addEventListener('activate', function(e) {
-        e.waitUntil(clients.claim());
-      });
-
-      self.addEventListener('notificationclick', function(e) {
-        e.notification.close();
-        e.waitUntil(
-          clients.matchAll({ type: 'window' }).then(function(clientList) {
-            // Ouvrir ou focus la page
-            for (var i = 0; i < clientList.length; i++) {
-              var client = clientList[i];
-              if (client.url.includes('github.io') && 'focus' in client) {
-                return client.focus();
-              }
-            }
-            if (clients.openWindow) {
-              return clients.openWindow(e.notification.data.url || '/');
-            }
-          })
-        );
-      });
-    `;
-
-    // Créer un blob et une URL pour le Service Worker
-    const swBlob = new Blob([swCode], { type: 'application/javascript' });
-    const swUrl = URL.createObjectURL(swBlob);
-
-    // Enregistrer le Service Worker
-    navigator.serviceWorker.register(swUrl)
-      .then(registration => {
-        console.log('✅ Service Worker enregistré');
-        // Nettoyer l'URL
-        setTimeout(() => URL.revokeObjectURL(swUrl), 1000);
-      })
-      .catch(err => {
-        console.error('❌ Erreur SW:', err);
-        // Fallback: essayer d'enregistrer un SW via un fichier
-        tryRegisterFallbackSW();
-      });
-  }
-
-  function tryRegisterFallbackSW() {
-    // Essayer d'enregistrer un SW depuis un fichier (si hébergé sur GitHub)
-    if (window.location.hostname.includes('github.io')) {
-      navigator.serviceWorker.register('service-worker.js')
-        .then(() => console.log('✅ SW fallback enregistré'))
-        .catch(() => console.warn('⚠️ Pas de SW fallback'));
-    }
-  }
-
-  // === AUTRES FONCTIONS ===
   function setFilter(value) {
     currentFilter = value;
     document.querySelectorAll('.filter-buttons button').forEach(btn => btn.classList.remove('active'));
@@ -411,6 +348,7 @@
     const repeat = document.getElementById("repeatSelect").value;
     const dueDate = document.getElementById("dateInput").value;
     const reminderTime = document.getElementById("reminderTimeInput").value;
+
     const taskDate = dueDate || new Date().toISOString().split('T')[0];
     
     const task = { text, repeat, dueDate: taskDate, reminderTime, completed: false, lastReminder: null };
@@ -519,6 +457,35 @@
     });
   }
 
+  // Notification quotidienne pour les tâches journalières
+  function sendDailyNotifications() {
+    const today = new Date().toISOString().split("T")[0];
+    
+    tasks.forEach((task, index) => {
+      if (task.repeat === "daily" && !task.completed && task.dueDate <= today) {
+        sendSystemNotification(
+          "📅 Tâche quotidienne",
+          `N'oubliez pas : "${task.text}"`,
+          `daily-${index}`
+        );
+      }
+    });
+  }
+
+  // Démarrer la vérification des rappels toutes les 30 secondes (plus réactif)
+  setInterval(checkReminders, 30 * 1000);
+
+  // Vérifier les tâches quotidiennes à 9h00
+  setInterval(() => {
+    const now = new Date();
+    if (now.getHours() === 9 && now.getMinutes() === 0) {
+      sendDailyNotifications();
+    }
+  }, 60000);
+
+  // Initialisation
+  loadTasks();
+
   function backupTasks() {
     const data = JSON.stringify(tasks, null, 2);
     const blob = new Blob([data], { type: "application/json" });
@@ -539,8 +506,7 @@
           tasks = importedTasks;
           saveTasks();
           loadTasks();
-          document.getElementById("message").innerText = "✅ Importé avec succès !";
-          setTimeout(() => document.getElementById("message").innerText = "", 3000);
+          document.getElementById("message").innerText = "✅";
         } else {
           throw new Error("Format invalide");
         }
@@ -550,27 +516,20 @@
     };
     reader.readAsText(input.files[0]);
   }
-
-  // === INITIALISATION ===
-  document.addEventListener('DOMContentLoaded', function() {
-    // Demander la permission pour les notifications
-    if ("Notification" in window && Notification.permission === "default") {
-      Notification.requestPermission();
+  
+  // Enregistrer le Service Worker au chargement de la page
+  document.addEventListener('DOMContentLoaded', () => {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('service-worker.js')
+        .then((registration) => {
+          console.log('Service Worker enregistré avec succès ✅', registration);
+        })
+        .catch((error) => {
+          console.error('Erreur lors de l’enregistrement du Service Worker ❌', error);
+        });
+    } else {
+      console.warn('Service Worker non supporté dans ce navigateur 🚫');
     }
-
-    // Enregistrer le Service Worker
-    registerServiceWorker();
-
-    // Charger les tâches
-    loadTasks();
-
-    // Vérifier les rappels toutes les 30 secondes (plus réactif)
-    setInterval(checkReminders, 30000);
-    
-    // Vérification immédiate au chargement
-    setTimeout(checkReminders, 1000);
-
-    console.log("✅ Application chargée - Les notifications apparaîtront en premier plan !");
   });
 
 </script>
