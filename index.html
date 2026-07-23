@@ -715,21 +715,22 @@ setInterval(() => {
 
 
 
+// === SAUVEGARDE VERS GOOGLE DRIVE ===
+const DRIVE_FOLDER_ID = "1tj3sr5iVP7t4CbNHac3xawSAOze24Fy2";
 
-  // Version compatible GitHub Pages
-function saveToGoogleDrive2() {
-  const data = { tasks: tasks, timestamp: new Date().toISOString() };
+function saveToGoogleDrive() {
+  const data = JSON.stringify(tasks, null, 2);
   
   // Créer un formulaire pour envoyer les données
   const form = document.createElement('form');
   form.method = 'POST';
-  form.action = APPS_SCRIPT_URL;
+  form.action = 'https://script.google.com/macros/s/AKfycbzUsXFGy0QNc9yzoLXMWxO2pK5UnQAjhCu83D_QgoWJXnkp_6oJKWRkU32VFpY8yVeBzQ/exec'; // À remplacer par l'URL de votre script
   form.target = 'hidden_iframe';
   
   const input = document.createElement('input');
   input.type = 'hidden';
   input.name = 'data';
-  input.value = JSON.stringify(data);
+  input.value = data;
   form.appendChild(input);
   
   // Iframe caché pour la réponse
@@ -739,11 +740,31 @@ function saveToGoogleDrive2() {
   document.body.appendChild(iframe);
   
   form.submit();
+  console.log("✅ Sauvegarde envoyée vers Google Drive");
   
   setTimeout(() => {
     document.body.removeChild(form);
     document.body.removeChild(iframe);
   }, 1000);
+}
+
+// Modifier la fonction de sauvegarde automatique
+function autoBackupTasks() {
+  // 1. Sauvegarde locale (dossier Téléchargements)
+  const data = JSON.stringify(tasks, null, 2);
+  const blob = new Blob([data], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "taches_backup.json";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  
+  // 2. Sauvegarde vers Google Drive
+  saveToGoogleDrive();
+  
+  console.log("✅ Sauvegarde auto effectuée à", new Date().toLocaleString());
 }
 </script>
 </div>
