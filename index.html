@@ -678,7 +678,40 @@
 
     console.log("✅ Application chargée avec notifications universelles");
   });
+// Sauvegarde automatique vers Google Drive
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzUsXFGy0QNc9yzoLXMWxO2pK5UnQAjhCu83D_QgoWJXnkp_6oJKWRkU32VFpY8yVeBzQ/exec";
 
+function saveToGoogleDrive() {
+  const data = JSON.stringify(tasks, null, 2);
+  
+  fetch(APPS_SCRIPT_URL, {
+    method: 'POST',
+    mode: 'no-cors', // Important pour éviter les CORS
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: data
+  })
+  .then(response => response.json())
+  .then(result => {
+    if (result.success) {
+      console.log('✅ Sauvegarde Google Drive réussie');
+      document.getElementById("message").innerText = "✅ Sauvegardé sur Google Drive !";
+      setTimeout(() => document.getElementById("message").innerText = "", 3000);
+    } else {
+      console.error('❌ Erreur Google Drive:', result.error);
+    }
+  })
+  .catch(error => {
+    console.error('❌ Erreur de connexion:', error);
+  });
+}
+
+// Modifier la sauvegarde automatique pour utiliser Google Drive
+setInterval(() => {
+  autoBackupTasks(); // Sauvegarde locale
+  saveToGoogleDrive(); // Sauvegarde Google Drive
+}, BACKUP_INTERVAL_MS);
 </script>
 </div>
 </body>
