@@ -69,40 +69,29 @@ async function loadTasks() {
 
 async function saveToGoogleDrive() {
 
-    try {
+    try{
 
-        const response = await fetch(GOOGLE_SCRIPT_URL, {
+        const response = await fetch(GOOGLE_SCRIPT_URL,{
 
-            method: "POST",
+            method:"POST",
 
-            headers: {
-                "Content-Type": "application/json"
+            headers:{
+                "Content-Type":"application/json"
             },
 
-            body: JSON.stringify(tasks)
+            body:JSON.stringify(tasks)
 
         });
 
-        const result = await response.json();
+        return await response.json();
 
-        if (result.success) {
+    }catch(e){
 
-            console.log("✅ Sauvegarde Google Drive réussie");
-
-        } else {
-
-            console.error(result.error);
-
-        }
-
-    } catch (err) {
-
-        console.error("Erreur Drive :", err);
+        console.error(e);
 
     }
 
 }
-
 // ===============================
 // Export JSON
 // ===============================
