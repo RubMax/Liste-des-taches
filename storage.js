@@ -26,28 +26,43 @@ function saveLocal() {
 
 async function loadTasks() {
 
-    const local = localStorage.getItem(STORAGE_KEY);
+    try {
 
-    if (local) {
+        const response = await fetch(GOOGLE_SCRIPT_URL);
 
-        try {
+        const result = await response.json();
 
-            tasks = JSON.parse(local);
+        if(result.success){
 
-        } catch (e) {
+            tasks = result.tasks || [];
 
-            tasks = [];
+            saveLocal();
+
+            return;
 
         }
 
-    } else {
+    } catch(e){
 
-        tasks = [];
+        console.log("Impossible de charger depuis Drive");
+
+    }
+
+    // Sinon localStorage
+
+    const local = localStorage.getItem(STORAGE_KEY);
+
+    if(local){
+
+        tasks = JSON.parse(local);
+
+    }else{
+
+        tasks=[];
 
     }
 
 }
-
 // ===============================
 // Sauvegarde Google Drive
 // ===============================
