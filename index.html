@@ -344,51 +344,81 @@
 
   // === VÉRIFICATION DES RAPPELS AMÉLIORÉE ===
   function checkReminders() {
+
     const now = new Date();
-    const currentMinutes = now.getHours() * 60 + now.getMinutes();
 
-    tasks.forEach((task, index) => {
-      // Ignorer les tâches accomplies ou sans heure de rappel
-      if (task.completed || !task.reminderTime) return;
+    const today = now.toISOString().split("T")[0];
 
-      const [hours, minutes] = task.reminderTime.split(":").map(Number);
-      const reminderMinutes = hours * 60 + minutes;
-      
-      // Marge de 2 minutes pour être plus tolérant
-      if (Math.abs(currentMinutes - reminderMinutes) <= 2) {
-        const lastReminder = task.lastReminder ? new Date(task.lastReminder) : null;
-        const nowTime = now.getTime();
-        
-        // Ne pas envoyer plus d'une fois par heure
-        if (!lastReminder || (nowTime - lastReminder.getTime()) > 60 * 60 * 1000) {
-          
-          // Envoyer la notification avec les 3 méthodes
-          sendNotification('🔔 Rappel de tâche', task.text);
-          
-          // Marquer comme envoyé
-          task.lastReminder = new Date().toISOString();
-          saveTasks();
-          saveToGoogleDrive();
-          
-          // Afficher aussi dans la liste des tâches
-          const taskList = document.getElementById("taskList");
-          if (taskList) {
-            const flashMsg = document.createElement("div");
-            flashMsg.className = "alert alert-warning alert-dismissible fade show mt-2";
-            flashMsg.innerHTML = `
-              <strong>🔔 Rappel :</strong> ${task.text}
-              <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            `;
-            taskList.parentNode.insertBefore(flashMsg, taskList);
-            setTimeout(() => {
-              if (flashMsg.parentElement) flashMsg.remove();
-            }, 15000);
-          }
+    const currentHour = now.getHours();
+    const currentMinute = now.getMinutes();
+
+    tasks.forEach(task => {
+
+        if (task.completed) return;
+
+        if (!task.reminderTime) return;
+
+        const [hour, minute] = task.reminderTime.split(":").map(Number);
+
+        if (hour !== currentHour || minute !== currentMinute) return;
+
+        const due = new Date(task.dueDate);
+
+        let show = false;
+
+        switch(task.repeat){
+
+            // Une seule fois
+            case "day":
+
+                show = (task.dueDate === today);
+
+                break;
+
+            // Tous les jours
+            case "daily":
+
+                show = true;
+
+                break;
+
+            // Chaque mois
+            case "monthly":
+
+                show = due.getDate() === now.getDate();
+
+                break;
+
+            // Chaque année
+            case "yearly":
+
+                show =
+                    due.getDate() === now.getDate() &&
+                    due.getMonth() === now.getMonth();
+
+                break;
+
         }
-      }
-    });
-  }
 
+        if(!show) return;
+
+        const key = today + "_" + currentHour + "_" + currentMinute;
+
+        if(task.lastReminder === key) return;
+
+        sendNotification(
+            "🔔 Rappel",
+            task.text
+        );
+
+        task.lastReminder = key;
+
+        saveTasks();
+        saveToGoogleDrive();
+
+    });
+
+}
   // === SERVICE WORKER - ENREGISTREMENT AMÉLIORÉ ===
   function registerServiceWorker() {
     if (!('serviceWorker' in navigator)) {
@@ -519,9 +549,24 @@
     const repeat = document.getElementById("repeatSelect").value;
     const dueDate = document.getElementById("dateInput").value;
     const reminderTime = document.getElementById("reminderTimeInput").value;
-    const taskDate = dueDate || new Date().toISOString().split('T')[0];
+    const taskDate = dueDate || "";
     
-    const task = { text, repeat, dueDate: taskDate, reminderTime, completed: false, lastReminder: null };
+    
+    const task = {
+
+    text,
+
+    repeat,
+
+    dueDate: taskDate,
+
+    reminderTime,
+
+    completed:false,
+
+    lastReminder:null
+
+};
     tasks.push(task);
     saveTasks();
     saveToGoogleDrive();
